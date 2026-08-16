@@ -1,11 +1,17 @@
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+# Copyright (C) 2026 Harry Webster
+# Source location: https://github.com/harrywebster/3d-printer-tepe-easy-pick-toothpicks-case
 """Regenerate every deliverable from one geometry module.
 
-    python3 build.py geom11 v11
+    python3 src/build.py geom14 v14        # -> build/v14/
+    EASYPICK_OUT=somewhere python3 src/build.py geom14 v14
+
+Normally driven by `make v14`, which runs this and then ships the result.
 
 Keeps the views, the schematic and the exported files locked to the same
 model — no more hand-edited import lines drifting apart.
 """
-import sys, zipfile, importlib
+import sys, os, zipfile, importlib
 import numpy as np, matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -14,7 +20,9 @@ from shapely.geometry import Polygon as SPoly
 from shapely.ops import unary_union
 import trimesh, render
 
-OUT = '/mnt/user-data/outputs/'
+# Where the deliverables land. Overridable so the build is not tied to one
+# machine's layout; the Makefile points it at build/<tag>/.
+OUT = os.path.join(os.environ.get('EASYPICK_OUT', 'build'), '')
 CASE_C, LID_C = (0.93, 0.93, 0.94), (0.95, 0.45, 0.10)
 WHITE, ORANGE = '#FFFFFF', '#FF6A13'
 INK, HID, FILL = '#1b1f24', '#8a949e', '#eef1f4'
@@ -369,6 +377,58 @@ Basic pairing.
 | Interference through the full slide | {checks['travel']} |
 | Shipped 3MF vs model volume | {checks['volume_match']} |
 
+Mesh volumes are compared to 0.1 mm³. The triangle counts are not compared:
+the boolean and hull libraries tessellate flat regions a few triangles
+differently between versions, which changes how the shape is written down and
+not the shape itself. `make verify` rebuilds this revision and checks it.
+
+## Repository layout
+
+```
+.                             latest revision, aliased in the root
+├── README.md                 this file (regenerated every revision)
+├── CLAUDE.md                 working rules for the project
+├── LICENSE                   CERN-OHL-S v2
+├── Makefile                  make {tag} — build and ship in one step
+├── requirements.txt          pinned build dependencies
+├── views.png  schematic.png  latest renders
+├── easypick-case.3mf         latest, both parts, filament slots assigned
+├── easypick-case.stl
+├── easypick-lid.stl
+├── revisions/                every version, exactly as shipped
+│   └── {tag + '/':<22}deliverables + geometry.py it was built from
+└── src/                      the generator
+    ├── {'geom%s.py' % tag[1:]:<22}the model — all parameters live here
+    ├── render.py             z-buffer renderer for the views
+    ├── build.py              one command: views, schematic, README, 3MF, STLs
+    ├── ship.py               copies a build into revisions/ and the root
+    └── verify.py             rebuilds a revision and diffs it against shipped
+```
+
+Build everything from the model:
+
+```
+make {tag}
+```
+
+which is `python3 src/build.py geom{tag[1:]} {tag}` followed by the copy into
+`revisions/{tag}/` and the root. G-code is not kept here — it is tied to the
+printer, filament and calibration state, so slice it locally from the 3MF.
+
+## Licence
+
+CERN Open Hardware Licence Version 2 — Strongly Reciprocal (CERN-OHL-S v2).
+The full text is in [LICENSE](LICENSE).
+
+You may use, make, modify and sell this design. If you distribute a modified
+version — as files or as printed parts — the licence requires you to release
+your modified source under CERN-OHL-S v2 as well, and to state what you
+changed. Modified designs therefore stay publicly available.
+
+Beyond what the licence requires: if you improve this, please send the change
+back so there stays one version everyone benefits from. That is a request, not
+a condition.
+
 ## Revisions
 
 | Version | Change |
@@ -382,6 +442,7 @@ Basic pairing.
 
 if __name__ == '__main__':
     mod, tag = sys.argv[1], sys.argv[2]
+    os.makedirs(OUT, exist_ok=True)
     g = importlib.import_module(mod)
     case, lid = g.make_case(), g.make_lid()
     print('built from %s: case %.1f mm3 watertight=%s | lid %.1f mm3 watertight=%s'

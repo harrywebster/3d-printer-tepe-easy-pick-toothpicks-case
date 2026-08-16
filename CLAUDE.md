@@ -7,13 +7,20 @@ were learned from a failure, and the failure is noted where it applies.
 
 1. Bump the version: copy `src/geomNN.py` to `geomNN+1.py`, change parameters there.
    Never edit a released revision in place.
-2. Run the single build script — it is the only path to shipped files:
+2. Run the single command — it is the only path to shipped files:
    ```
-   python3 src/build.py geom14 v14
+   make v14
    ```
-3. It regenerates **all** of: views PNG, schematic PNG, README.md, colour 3MF,
-   both STLs. Never generate one without the others.
-4. Copy the output into `revisions/vNN/` and refresh the aliases in the repo root.
+   which is `python3 src/build.py geom14 v14` into `build/v14/`, then
+   `src/ship.py` copying that into `revisions/v14/` and the root aliases.
+   `ship.py` only ever copies; it never regenerates anything.
+3. The build regenerates **all** of: views PNG, schematic PNG, README.md,
+   colour 3MF, both STLs. Never generate one without the others.
+4. Shipping refuses to overwrite an existing `revisions/vNN`. If you hit that
+   guard, the answer is almost always to bump the version, not `FORCE=1`.
+
+`make verify` rebuilds whatever the root currently ships and diffs it, without
+shipping anything. Run it after changing a dependency or on a fresh machine.
 
 > **Why one script.** Around v5–v6 the exporter's import line was edited by hand
 > and silently kept pointing at the old geometry module. Two revisions shipped
@@ -32,6 +39,19 @@ The build asserts and records these in the README:
 | Shipped 3MF reloaded vs model volume | must match |
 
 If any regress, fix before shipping. Report the numbers, don't assert "verified".
+
+Compare meshes by volume and bounds, never byte-for-byte. The boolean and hull
+libraries tessellate flat regions a few triangles differently between versions;
+that changes how the shape is written down, not the shape. `src/verify.py` does
+it this way. A real regression moves a volume or a bound.
+
+## Dependencies
+
+`requirements.txt` is pinned, because the README quotes volumes to 0.1 mm³ and
+the checks compare them. `scipy`, `lxml`, `rtree` and `networkx` are listed even
+though nothing imports them directly — trimesh loads them for convex hulls, 3MF
+reading, proximity queries and `body_count`. Without them the build dies
+part-way through, *after* writing some of the deliverables. Don't prune them.
 
 ## Writing rules
 
@@ -74,7 +94,5 @@ Decline auto-support if the slicer offers it for the spring slot region. The
 "floating cantilever" warning there is expected: the strip is a 30 mm bridge
 anchored at both ends, not a cantilever.
 
-## G-code
-
-Not generated here. G-code is specific to the printer, filament and calibration
-state, so it is sliced locally from the 3MF and dropped into `gcode/` if wanted.
+G-code is not generated or kept in this repo. It is specific to the printer,
+filament and calibration state, so slice it locally from the 3MF each time.

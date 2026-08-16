@@ -1,0 +1,23 @@
+# Build dependencies for src/build.py. Pinned, because the mesh booleans and
+# the convex hulls must give the same numbers on every machine — the README
+# quotes volumes to 0.1 mm3 and the checks compare them.
+#
+# Install into a venv:  make deps      (or: pip install -r requirements.txt)
+# Verified on CPython 3.13.7, macOS arm64.
+
+# --- geometry ---
+trimesh==5.0.0
+manifold3d==3.5.2        # the boolean engine every difference/union names
+shapely==2.1.2           # 2-D outlines the profiles are offset from
+numpy==2.5.2
+
+# --- drawing ---
+matplotlib==3.11.1       # views + schematic, Agg backend only
+
+# --- trimesh's optional backends, all of them load-bearing here ---
+# Not optional in practice: without these the build dies part-way through,
+# after it has already written some of the deliverables.
+scipy==1.18.0            # convex_hull -> QHull. Every prism/hull profile needs it.
+lxml==6.1.1              # reloading the shipped 3MF for the volume check
+rtree==1.4.1             # spatial index for the proximity queries
+networkx==3.6.1          # mesh graph ops behind body_count
