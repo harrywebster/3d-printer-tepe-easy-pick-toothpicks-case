@@ -16,7 +16,7 @@ cut in the side walls and is held shut by a sprung catch at the mouth.
 Everything below is generated from the model itself, so the numbers match the
 files in this folder.
 
-![Views](views.png)
+![Views](easypick-case-v13-views.png)
 
 ## Dimensions
 
@@ -28,7 +28,7 @@ files in this folder.
 Cavity volume 58,560 mm³. Case body 30,165 mm³ of material,
 lid 10,482 mm³.
 
-![Schematic](schematic.png)
+![Schematic](easypick-case-v13-schematic.png)
 
 ## How it goes together
 
@@ -86,8 +86,8 @@ flowchart TD
 | Orientation | Both parts flat, as laid out in the 3MF |
 | Brim | 5 mm recommended |
 
-Files: `easypick-case.3mf` carries both parts with filament slots
-assigned, `easypick-case.stl` and `easypick-lid.stl` are the same
+Files: `easypick-case-v13-colour.3mf` carries both parts with filament slots
+assigned, `easypick-case-v13.stl` and `easypick-lid-v13.stl` are the same
 geometry separately.
 
 ## Care
@@ -118,31 +118,6 @@ Basic pairing.
 | Lid protruding outside the shell | 0.00 mm³ |
 | Interference through the full slide | clear; only the catch, 38.5 mm3 |
 | Shipped 3MF vs model volume | 30164.6 / 10482.0 vs 30164.6 / 10482.0 mm3 |
-
-## Repository layout
-
-```
-.                             latest revision, aliased in the root
-├── README.md                 this file (regenerated every revision)
-├── CLAUDE.md                 working rules for the project
-├── views.png  schematic.png  latest renders
-├── easypick-case.3mf         latest, both parts, filament slots assigned
-├── easypick-case.stl
-├── easypick-lid.stl
-├── revisions/                every version, exactly as shipped
-│   └── v13/
-├── src/                      the generator
-│   ├── geom13.py             the model — all parameters live here
-│   ├── render.py             z-buffer renderer for the views
-│   └── build.py              one command: views, schematic, README, 3MF, STLs
-└── gcode/                    sliced locally, not generated here
-```
-
-Rebuild everything from the model:
-
-```
-python3 src/build.py geom13 v13
-```
 
 ## Revisions
 
