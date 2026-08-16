@@ -119,30 +119,57 @@ Basic pairing.
 | Interference through the full slide | clear; only the catch, 38.5 mm3 |
 | Shipped 3MF vs model volume | 30164.6 / 10482.0 vs 30164.6 / 10482.0 mm3 |
 
+Mesh volumes are compared to 0.1 mm³. The triangle counts are not compared:
+the boolean and hull libraries tessellate flat regions a few triangles
+differently between versions, which changes how the shape is written down and
+not the shape itself. `make verify` rebuilds this revision and checks it.
+
 ## Repository layout
 
 ```
 .                             latest revision, aliased in the root
 ├── README.md                 this file (regenerated every revision)
 ├── CLAUDE.md                 working rules for the project
+├── LICENSE                   CERN-OHL-S v2
+├── Makefile                  make v13 — build and ship in one step
+├── requirements.txt          pinned build dependencies
 ├── views.png  schematic.png  latest renders
 ├── easypick-case.3mf         latest, both parts, filament slots assigned
 ├── easypick-case.stl
 ├── easypick-lid.stl
 ├── revisions/                every version, exactly as shipped
-│   └── v13/
-├── src/                      the generator
-│   ├── geom13.py             the model — all parameters live here
-│   ├── render.py             z-buffer renderer for the views
-│   └── build.py              one command: views, schematic, README, 3MF, STLs
-└── gcode/                    sliced locally, not generated here
+│   └── v13/                  deliverables + geometry.py it was built from
+└── src/                      the generator
+    ├── geom13.py             the model — all parameters live here
+    ├── render.py             z-buffer renderer for the views
+    ├── build.py              one command: views, schematic, README, 3MF, STLs
+    ├── ship.py               copies a build into revisions/ and the root
+    └── verify.py             rebuilds a revision and diffs it against shipped
 ```
 
-Rebuild everything from the model:
+Build everything from the model:
 
 ```
-python3 src/build.py geom13 v13
+make v13
 ```
+
+which is `python3 src/build.py geom13 v13` followed by the copy into
+`revisions/v13/` and the root. G-code is not kept here — it is tied to the
+printer, filament and calibration state, so slice it locally from the 3MF.
+
+## Licence
+
+CERN Open Hardware Licence Version 2 — Strongly Reciprocal (CERN-OHL-S v2).
+The full text is in [LICENSE](LICENSE).
+
+You may use, make, modify and sell this design. If you distribute a modified
+version — as files or as printed parts — the licence requires you to release
+your modified source under CERN-OHL-S v2 as well, and to state what you
+changed. Modified designs therefore stay publicly available.
+
+Beyond what the licence requires: if you improve this, please send the change
+back so there stays one version everyone benefits from. That is a request, not
+a condition.
 
 ## Revisions
 
