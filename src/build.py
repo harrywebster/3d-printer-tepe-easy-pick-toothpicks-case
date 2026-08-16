@@ -50,8 +50,8 @@ def views(g, case, lid, tag):
     for i, (t, img) in enumerate(imgs):
         ax = fig.add_subplot(gs[i // 2, i % 2]); ax.imshow(img); ax.axis('off')
         ax.set_title(t, fontsize=11, weight='bold', color='#222', pad=4)
-    fig.suptitle('EasyPick case %s — %.1f × %.1f × %.1f mm'
-                 % (tag, g.out_w, g.out_l, g.out_h),
+    fig.suptitle('EasyPick case — %.1f × %.1f × %.1f mm'
+                 % (g.out_w, g.out_l, g.out_h),
                  fontsize=15, weight='bold', color='#111', y=0.965)
     fig.text(0.5, 0.005, 'PLA Basic White body, PLA Basic Orange lid.',
              ha='center', fontsize=9, color='#666')
@@ -135,8 +135,12 @@ def schematic(g, case, lid, tag):
     ax4.annotate('floor %.1f' % g.floor_t, xy=(-6, g.floor_t/2), xytext=(-30, -9), **lab)
     ax4.annotate('lid %.1f + %.1f boss' % (g.lid_t, g.lip), xy=(-8, g.lid_z + 2.4),
                  xytext=(-40, g.out_h + 9), **lab)
-    ax4.annotate('catch %.1f on a %.1f strip' % (g.det_h, g.tongue_t),
-                 xy=(g.y_end, g.shelf_z + 0.4), xytext=(-2, g.out_h + 11), **lab)
+    if getattr(g, 'HAS_CATCH', True):
+        ax4.annotate('catch %.1f on a %.1f strip' % (g.det_h, g.tongue_t),
+                     xy=(g.y_end, g.shelf_z + 0.4), xytext=(-2, g.out_h + 11), **lab)
+    else:
+        ax4.annotate('lid held by the rails alone — no catch',
+                     xy=(g.y_end, g.shelf_z + 0.4), xytext=(-8, g.out_h + 11), **lab)
     ax4.annotate('rail %.1f, clearance %.2f' % (g.rail, g.clr),
                  xy=(-g.int_l/2 - 1.2, g.lid_z + 1.2),
                  xytext=(-g.out_l/2 - 26, g.lid_z - 6), **lab)
@@ -170,7 +174,7 @@ def schematic(g, case, lid, tag):
     for a in (ax4, ax5):
         a.set_aspect('equal'); a.axis('off')
 
-    fig.suptitle('EasyPick case %s — general arrangement' % tag, fontsize=15.5,
+    fig.suptitle('EasyPick case — general arrangement', fontsize=15.5,
                  weight='bold', color='#111', y=0.975)
     fig.text(0.5, 0.008, 'All dimensions in millimetres. Grey outline = lid position. '
              'Cavity %.0f × %.0f × %.0f.' % (g.int_w, g.int_l, g.int_h),
@@ -215,6 +219,15 @@ def export(g, case, lid, tag):
           '<metadata key="extruder" value="1"/></object>\n'
           '  <object id="2"><metadata key="name" value="EasyPick lid"/>'
           '<metadata key="extruder" value="2"/></object>\n</config>\n')
+
+    # Supports off, carried in the file rather than left to the operator.
+    # Auto-support fires on the spring slot, and support printed inside that
+    # slot cannot be removed and would jam the catch. The key name is Bambu
+    # Studio's own — it matches fdm_process_common.json in the installed
+    # profiles, and Orca uses the same schema.
+    # Kept to the single key: anything else here would be adopted as project
+    # settings on import and could quietly replace the operator's own profile.
+    ps = '{\n  "enable_support": "0"\n}\n'
     ct = ('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org'
           '/package/2006/content-types"><Default Extension="rels" ContentType="application/'
           'vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" '
@@ -225,9 +238,19 @@ def export(g, case, lid, tag):
             'openxmlformats.org/package/2006/relationships"><Relationship Target='
             '"/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/'
             '3dmanufacturing/2013/01/3dmodel"/></Relationships>')
+    why = ('If the slicer offers auto-support for the spring slot at the mouth,\n'
+           'decline it. Support inside that slot cannot be removed and would jam\n'
+           'the catch. The "floating cantilever" warning there is expected: the\n'
+           'strip is a bridge anchored at both ends, not a cantilever.\n'
+           if getattr(g, 'HAS_CATCH', True) else
+           'There is nothing unsupported in either part — no bridges, no\n'
+           'overhangs. If the slicer proposes support anywhere, something is\n'
+           'wrong with the orientation, not with the model.\n')
     readme = ('EasyPick case %s\nObject 1  case body -> slot 1  PLA Basic White  %s\n'
               'Object 2  lid       -> slot 2  PLA Basic Orange %s\n'
-              'Both parts flat on the plate as modelled. No supports.\n' % (tag, WHITE, ORANGE))
+              'Both parts flat on the plate as modelled.\n\n'
+              'NO SUPPORTS. project_settings.config sets enable_support to 0.\n'
+              % (tag, WHITE, ORANGE)) + why
 
     p = OUT + 'easypick-case-%s-colour.3mf' % tag
     with zipfile.ZipFile(p, 'w', zipfile.ZIP_DEFLATED) as z:
@@ -235,6 +258,7 @@ def export(g, case, lid, tag):
         z.writestr('_rels/.rels', rels)
         z.writestr('3D/3dmodel.model', model)
         z.writestr('Metadata/model_settings.config', ms)
+        z.writestr('Metadata/project_settings.config', ps)
         z.writestr('Metadata/README.txt', readme)
     return p, stls
 
@@ -251,12 +275,69 @@ HISTORY = [
     ('v11', 'floor dish removed; single build script introduced'),
     ('v12', '2 mm radius where the floor meets the walls'),
     ('v13', 'walls to 4.0 so the outside lands on whole millimetres'),
+    ('v14', 'spring slot and catch onto the 0.20 layer grid after the v13 bridge '
+            'dropped filament; lid geometry untouched'),
+    ('v15', 'catch removed after the spring failed to print twice — the lid is '
+            'held by the rails, and nothing in the part is unsupported'),
+    ('v16', 'v15 slid open too easily: channel tapered tighter over the last '
+            '6 mm at the deep end, plus a push notch through the lip'),
 ]
 
 def readme(g, case, lid, tag, checks):
     cav = g.int_w * g.int_l * g.int_h
     hist = '\n'.join('| %s | %s |' % (v, d) for v, d in HISTORY)
-    txt = f"""# EasyPick case — {tag}
+    hc = checks['has_catch']
+
+    # The catch was removed at v15, so every passage describing it is written
+    # from the model rather than left to go stale.
+    shut = ('is held shut by a sprung catch at the mouth'
+            if hc else 'is held shut by friction in those rails')
+    flow = ('''    D["Sprung strip ducks<br/>as the catch passes"] --> E
+    E["Groove in the lid<br/>swallows the ridge"] --> F["Closed — %.1f N to open"]'''
+            % checks['force'] if hc else
+            '''    D["Friction in the rails<br/>holds it shut"] --> F["Closed"]''')
+    catch_bullets = ('''- **Sprung catch.** A %.0f mm strip of the end wall, %.1f mm
+  thick, is freed by a %.1f mm slot beneath it. It carries a
+  %.1f mm ridge giving %.2f mm of net engagement, about
+  %.1f N to open. Without the slot the catch would be rigid and
+  would not click at all.
+- **Relief at the slot roots.** Ø%.1f holes and a %.1f mm
+  chamfer inside and out, so the strip roots into a radius rather than a square
+  corner that would crack.''' % (g.tongue_w, g.tongue_t, g.slot_h, g.det_h,
+                                 checks['net'], checks['force'],
+                                 2*g.relief_r, g.slot_ch) if hc else
+        '''- **No catch, and nothing unsupported.** The lid is held by the fit of the
+  rails. Earlier revisions used a sprung strip at the mouth, but anything that
+  has to deflect downward in a part printed flat needs air beneath it, and that
+  strip failed to print twice. Removing it leaves the case with no bridges and
+  no overhangs anywhere — it is the reason this revision prints.
+- **Running clearance is its own number.** `slide_clr` (%.2f mm) grows only the
+  channel cut into the case, so the slide can be tightened or loosened without
+  touching the lid.''' % getattr(g, 'slide_clr', g.clr))
+    if not hc and getattr(g, 'HAS_DETENT_FIT', False):
+        zone = ('cut %.2f mm smaller than the lid, so the two must deform '
+                'slightly to seat' % (2*abs(g.detent_clr))
+                if g.detent_clr < 0 else
+                'run at %.2f mm clearance' % g.detent_clr)
+        catch_bullets += '''
+- **Detent by interference.** The last %.0f mm at the deep end of the channel is
+  %s, against %.2f mm of clearance everywhere else.
+  Only the lid's leading edge reaches that zone, and only within %.0f mm of
+  shut, so the case grips the lid closed instead of resisting across the whole
+  travel. Nothing about it is unsupported — it is a change of size in a cut
+  that already existed.
+- **Push notch.** A %.0f mm window through the lip at the deep end exposes the
+  lid's leading edge so it can be pushed toward the mouth. It is a cut rather
+  than an addition, so the case still stands %.1f mm tall and pockets flat.''' % (
+            g.detent_len, zone, g.slide_clr, g.detent_len, g.notch_w, g.out_h)
+    seal = ('the spring slot at the mouth is an opening straight into the\ncavity, so the case is not sealed against water'
+            if hc else 'the lid slides in an open channel, so the case is not\nsealed against water')
+    reach = ('''The one place nothing will reach is the
+%.1f mm spring slot at the mouth — that is the price of a catch that
+actually clicks. Printing''' % g.slot_h if hc else
+             '''With the spring slot gone there is no longer a
+blind pocket anywhere inside. Printing''')
+    txt = f"""# EasyPick case
 
 ## Why this exists
 
@@ -269,7 +350,7 @@ these picks, so I made this.
 
 A slide-lid pocket case for TePe EasyPick interdental picks, printed in two
 parts on a Bambu Lab A1. The body holds the picks; the lid slides into rails
-cut in the side walls and is held shut by a sprung catch at the mouth.
+cut in the side walls and {shut}.
 
 Everything below is generated from the model itself, so the numbers match the
 files in this folder.
@@ -295,8 +376,7 @@ flowchart LR
     A["Case body<br/>PLA Basic White"] -->|"lid enters at the mouth"| C
     B["Lid<br/>PLA Basic Orange"] --> C
     C["Rails: lid tucks {g.rail:.1f} mm<br/>into each wall"] --> D
-    D["Sprung strip ducks<br/>as the catch passes"] --> E
-    E["Groove in the lid<br/>swallows the ridge"] --> F["Closed — {checks['force']:.1f} N to open"]
+{flow}
 ```
 
 ## The height stack
@@ -315,14 +395,7 @@ flowchart TD
 - **Slide lid, no hinge.** The lid tucks {g.rail:.1f} mm into each side wall
   under a {g.lip:.1f} mm lip. The groove roof sits at about
   {checks['angle']:.0f}° so it prints unsupported.
-- **Sprung catch.** A {g.tongue_w:.0f} mm strip of the end wall, {g.tongue_t:.1f} mm
-  thick, is freed by a {g.slot_h:.1f} mm slot beneath it. It carries a
-  {g.det_h:.1f} mm ridge giving {checks['net']:.2f} mm of net engagement, about
-  {checks['force']:.1f} N to open. Without the slot the catch would be rigid and
-  would not click at all.
-- **Relief at the slot roots.** Ø{2*g.relief_r:.1f} holes and a {g.slot_ch:.1f} mm
-  chamfer inside and out, so the strip roots into a radius rather than a square
-  corner that would crack.
+{catch_bullets}
 - **Flush lid panel** with a {g.gap:.2f} mm shadow gap, ribbed at
   {2.4:.1f} mm pitch across the slide direction for grip.
 - **Flat base.** No bottom chamfer — the full footprint meets the plate, which
@@ -340,7 +413,7 @@ flowchart TD
 | Layer | 0.20 mm |
 | Walls | 4 loops |
 | Material | PLA Basic — White body, Orange lid (PETG if you want it washable) |
-| Supports | None |
+| Supports | None — the 3MF sets `enable_support` to 0 |
 | Orientation | Both parts flat, as laid out in the 3MF |
 | Brim | 5 mm recommended |
 
@@ -351,19 +424,16 @@ geometry separately.
 ## Care
 
 Clean it regularly with warm water, then finish with an alcohol wipe. Don't
-submerge it — the spring slot at the mouth is an opening straight into the
-cavity, so the case is not sealed against water.
+submerge it — {seal}.
 
 Two things worth knowing if you print it in PLA. Keep the water warm rather than
 hot — PLA starts to soften around 55–60 °C, so a dishwasher or a hot tap will
-distort it, particularly the sprung strip and the rails. And let it dry fully
+distort it, particularly the rails. And let it dry fully
 before the alcohol wipe, so the alcohol is doing the work rather than diluting
 into standing water in the corners.
 
 The {g.floor_fillet:.0f} mm radius at the floor means a cotton bud or a fingertip in a
-cloth reaches the whole inside. The one place nothing will reach is the
-{g.slot_h:.1f} mm spring slot at the mouth — that is the price of a catch that
-actually clicks. Printing in PETG instead of PLA lifts the temperature limit
+cloth reaches the whole inside. {reach} in PETG instead of PLA lifts the temperature limit
 and makes the case properly washable, at the cost of the white-and-orange PLA
 Basic pairing.
 
@@ -389,30 +459,30 @@ not the shape itself. `make verify` rebuilds this revision and checks it.
 ├── README.md                 this file (regenerated every revision)
 ├── CLAUDE.md                 working rules for the project
 ├── LICENSE                   CERN-OHL-S v2
-├── Makefile                  make {tag} — build and ship in one step
+├── Makefile                  make vNN — build and ship in one step
 ├── requirements.txt          pinned build dependencies
 ├── views.png  schematic.png  latest renders
 ├── easypick-case.3mf         latest, both parts, filament slots assigned
 ├── easypick-case.stl
 ├── easypick-lid.stl
 ├── revisions/                every version, exactly as shipped
-│   └── {tag + '/':<22}deliverables + geometry.py it was built from
+│   └── vNN/                  deliverables + geometry.py it was built from
 └── src/                      the generator
-    ├── {'geom%s.py' % tag[1:]:<22}the model — all parameters live here
+    ├── geomNN.py             the model — all parameters live here
     ├── render.py             z-buffer renderer for the views
     ├── build.py              one command: views, schematic, README, 3MF, STLs
     ├── ship.py               copies a build into revisions/ and the root
     └── verify.py             rebuilds a revision and diffs it against shipped
 ```
 
-Build everything from the model:
+Build everything from the model, where NN is the revision:
 
 ```
-make {tag}
+make vNN
 ```
 
-which is `python3 src/build.py geom{tag[1:]} {tag}` followed by the copy into
-`revisions/{tag}/` and the root. G-code is not kept here — it is tied to the
+which is `python3 src/build.py geomNN vNN` followed by the copy into
+`revisions/vNN/` and the root. G-code is not kept here — it is tied to the
 printer, filament and calibration state, so slice it locally from the 3MF.
 
 ## Licence
@@ -459,18 +529,42 @@ if __name__ == '__main__':
 
     import math
     breach = trimesh.boolean.difference([lid, g.outer_shell()], engine='manifold').volume
-    ridge = g.detent_ridge()
-    net = ridge.bounds[1][2] - g.lid_z - g.clr
-    span = g.tongue_w + 2*g.relief_r
-    force = 192*2000*(g.wall*g.tongue_t**3/12)*net/span**3
+    has_catch = getattr(g, 'HAS_CATCH', True)
+    if has_catch:
+        ridge = g.detent_ridge()
+        net = ridge.bounds[1][2] - g.lid_z - g.clr
+        span = g.tongue_w + 2*g.relief_r
+        force = 192*2000*(g.wall*g.tongue_t**3/12)*net/span**3
+    else:
+        net = force = 0.0
+    # A designed interference fit means the lid SHOULD foul at the closed
+    # position. Sample finely near shut so the check can say where the grip
+    # releases rather than just failing on it.
+    fit = getattr(g, 'HAS_DETENT_FIT', False)
+    dists = (0, 3, 6, 10, 20, 55, 80)
     tr = []
-    for d in (0, 20, 55, 80):
+    for d in dists:
         t = lid.copy(); t.apply_translation([0, d, 0])
         tr.append(trimesh.boolean.intersection([case, t], engine='manifold').volume)
-    travel = ('clear; only the catch, %.1f mm3' % max(tr)) if tr[0] < 0.01 else 'FAIL'
+    free = max(v for d, v in zip(dists, tr) if d >= 10)
+    if fit:
+        released = [d for d, v in zip(dists, tr) if d > 0 and v < 0.01]
+        if free >= 0.01:
+            travel = 'FAIL — fouls %.2f mm3 away from the detent' % free
+        elif not released:
+            travel = 'FAIL — detent never releases within %d mm' % dists[-1]
+        else:
+            travel = ('detent grips %.1f mm3 shut, free by %d mm, '
+                      'clear beyond' % (tr[0], released[0]))
+    elif tr[0] >= 0.01:
+        travel = 'FAIL — fouls at the closed position'
+    elif has_catch:
+        travel = 'clear; only the catch, %.1f mm3' % max(tr)
+    else:
+        travel = 'clear throughout, %.2f mm3 peak' % max(tr)
     checks = dict(case_ok=case.is_watertight and case.body_count == 1,
                   lid_ok=lid.is_watertight and lid.body_count == 1,
                   breach=breach, travel=travel, volume_match=match,
-                  net=net, force=force,
+                  net=net, force=force, has_catch=has_catch,
                   angle=math.degrees(math.atan(g.lid_t/g.rail)))
     print(readme(g, case, lid, tag, checks))
