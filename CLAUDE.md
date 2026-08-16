@@ -19,6 +19,12 @@ were learned from a failure, and the failure is noted where it applies.
 4. Shipping refuses to overwrite an existing `revisions/vNN`. If you hit that
    guard, the answer is almost always to bump the version, not `FORCE=1`.
 
+5. Present the newly built files in the conversation for verification before
+   they are treated as done — the views PNG, the schematic PNG, the README and
+   the printable files. Report the check numbers alongside them. A revision is
+   not finished when the build exits zero; it is finished when the files have
+   been looked at.
+
 `make verify` rebuilds whatever the root currently ships and diffs it, without
 shipping anything. Run it after changing a dependency or on a fresh machine.
 

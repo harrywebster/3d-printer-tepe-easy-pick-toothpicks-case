@@ -26,12 +26,29 @@ BOUND_TOL = 1e-6   # mm
 
 
 def shipped_tag():
-    head = open(os.path.join(ROOT, 'README.md')).readline()
-    m = re.search(r'\bv\d+\b', head)
-    if not m:
-        sys.exit('cannot tell which revision the root ships — README.md first line '
-                 'is %r' % head.strip())
-    return m.group(0)
+    """Which revision is in the root?
+
+    Found by matching the root README against the revisions, not by parsing a
+    version out of the prose — the READMEs deliberately carry no version in
+    their text, and an earlier attempt to read it from the title broke the
+    moment that was removed. ship.py writes the same README to both places,
+    so exactly one revision matches byte for byte.
+    """
+    root = open(os.path.join(ROOT, 'README.md'), 'rb').read()
+    revs = os.path.join(ROOT, 'revisions')
+    hits = []
+    for name in sorted(os.listdir(revs)):
+        p = os.path.join(revs, name, 'README.md')
+        if os.path.isfile(p) and open(p, 'rb').read() == root:
+            hits.append(name)
+    if len(hits) == 1:
+        return hits[0]
+    if not hits:
+        sys.exit('the root README matches no revision in revisions/ — the root '
+                 'and the archive have diverged. Re-ship, or work out which is '
+                 'right before trusting either.')
+    sys.exit('the root README matches more than one revision (%s); cannot tell '
+             'which is shipped' % ', '.join(hits))
 
 
 def main():
